@@ -6,31 +6,45 @@
 # Import the rospy package. For an import to work, it must be specified
 # in both the package manifest AND the Python file in which it is used.
 import rospy
-
+import sys
 # Import the String message type from the /msg directory of the std_msgs package.
 from std_msgs.msg import String
+from geometry_msgs.msg import Twist
+
+vel_msg = Twist()
+turtle_name = sys.argv[1]
+
 
 # Define the method which contains the node's main functionality
 def talker():
 
     # Create an instance of the rospy.Publisher object which we can  use to
     # publish messages to a topic. This publisher publishes messages of type
-    # std_msgs/String to the topic /chatter_talk
-    pub = rospy.Publisher('chatter_talk', String, queue_size=10)
-    
+    # std_msgs/TimeStampString to the topic /user_messages
+    #print("NAME IS " + turtle_name)
+    pub = rospy.Publisher( "/" +turtle_name+"/cmd_vel", Twist, queue_size=10)
+
     # Create a timer object that will sleep long enough to result in a 10Hz
     # publishing rate
     r = rospy.Rate(10) # 10hz
+    
 
     # Loop until the node is killed with Ctrl-C
     while not rospy.is_shutdown():
         # Construct a string that we want to publish (in Python, the "%"
         # operator functions similarly to sprintf in C or MATLAB)
-        pub_string = "hello world %s" % (rospy.get_time())
+        
+        speed = input("Speed")
+        vel_msg.linear.x = int(speed)
+        pub.publish(vel_msg)
+        #tstamp = rospy.get_time()
+        #temp = TimestampString()
+        #temp.message = user_inp
+        #temp.timestamp = tstamp
         
         # Publish our string to the 'chatter_talk' topic
-        pub.publish(pub_string)
-        print(rospy.get_name() + ": I sent \"%s\"" % pub_string)
+        #pub.publish(temp)
+        #print(rospy.get_name() + ": I sent \"%s\"" % pub_string)
         
         # Use our rate object to sleep until it is time to publish again
         r.sleep()
