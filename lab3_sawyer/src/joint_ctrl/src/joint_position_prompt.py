@@ -25,6 +25,8 @@ import intera_external_devices
 
 from intera_interface import CHECK_VERSION
 
+import time
+
 
 def map_keyboard(side):
     limb = intera_interface.Limb(side)
@@ -39,12 +41,28 @@ def map_keyboard(side):
 
     joints = limb.joint_names()
 
+
+
+
+
     def set_j(limb, joint_name, delta):
         current_position = limb.joint_angle(joint_name)
+
+
+
         joint_command = {joint_name: current_position + delta}
+
+
+
         print("Executing" + str(joint_command))
         limb.set_joint_position_speed(0.3)
         limb.set_joint_positions(joint_command)
+
+
+
+
+
+
 
     def set_g(action):
         if has_gripper:
@@ -79,29 +97,58 @@ def map_keyboard(side):
         })
     done = False
     print("Controlling joints. Press ? for help, Esc to quit.")
+
+
+    
     while not done and not rospy.is_shutdown():
-        c = intera_external_devices.getch()
-        if c:
-            #catch Esc or ctrl-c
-            if c in ['\x1b', '\x03']:
-                done = True
-                rospy.signal_shutdown("Example finished.")
-            elif c in bindings:
-                cmd = bindings[c]
-                if c == '8' or c == 'i' or c == '9':
-                    cmd[0](cmd[1])
-                    print("command: %s" % (cmd[2],))
-                else:
-                    #expand binding to something like "set_j(right, 'j0', 0.1)"
-                    cmd[0](*cmd[1])
-                    print("command: %s" % (cmd[2],))
-            else:
-                print("key bindings: ")
-                print("  Esc: Quit")
-                print("  ?: Help")
-                for key, val in sorted(list(bindings.items()),
-                                       key=lambda x: x[1][2]):
-                    print("  %s: %s" % (key, val[2]))
+        
+
+        #create dictionary
+
+        posdic = {}
+
+        posdic[joints[0]] = float(input("Position for Joint 0"))
+        posdic[joints[1]] = float(input("Position for Joint 1"))
+        posdic[joints[2]] = float(input("Position for Joint 2"))
+        posdic[joints[3]] = float(input("Position for Joint 3"))
+        posdic[joints[4]] = float(input("Position for Joint 4"))
+        posdic[joints[5]] = float(input("Position for Joint 5"))
+        posdic[joints[6]] = float(input("Position for Joint 6"))
+        print("Executing")
+        
+        
+        while True:
+           
+            limb.set_joint_position_speed(0.1)
+
+            limb.set_joint_positions(posdic)
+
+            time.sleep(0.01)
+
+
+
+        #elif c in bindings:
+           
+            #if c == '8' or c == 'i' or c == '9':
+                #cmd[0](cmd[1])
+                #print("command: %s" % (cmd[2],))
+            #else:
+                #expand binding to something like "set_j(right, 'j0', 0.1)"
+                #cmd[0](*cmd[1])
+                #print("command: %s" % (cmd[2],))
+
+
+
+
+
+
+            # #else:
+            #     print("key bindings: ")
+            #     print("  Esc: Quit")
+            #     print("  ?: Help")
+            #     for key, val in sorted(list(bindings.items()),
+            #                            key=lambda x: x[1][2]):
+            #         print("  %s: %s" % (key, val[2]))
 
 def main():
     """RSDK Joint Position Example: Keyboard Control
@@ -133,7 +180,7 @@ See help inside the example with the '?' key for key bindings.
     args = parser.parse_args(rospy.myargv()[1:])
 
     print("Initializing node... ")
-    rospy.init_node("sdk_joint_position_keyboard")
+    rospy.init_node("sdk_joint_position_prompt")
     print("Getting robot state... ")
     rs = intera_interface.RobotEnable(CHECK_VERSION)
     init_state = rs.state().enabled
@@ -144,7 +191,6 @@ See help inside the example with the '?' key for key bindings.
     rospy.on_shutdown(clean_shutdown)
 
     rospy.loginfo("Enabling robot...")
-    rs.enable()
     map_keyboard(args.limb)
     print("Done.")
 

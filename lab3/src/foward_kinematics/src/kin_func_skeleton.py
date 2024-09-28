@@ -104,7 +104,13 @@ def skew_3d(omega):
     omega_hat - (3,3) ndarray: the corresponding skew symmetric matrix
     """
 
-    # YOUR CODE HERE
+    omega_hat = np.array([[0, -omega[2], omega[1]],
+                          [omega[2], 0, -omega[0]],
+                          [-omega[1], omega[0], 0]])
+    
+    return omega_hat
+
+
 
 def rotation_3d(omega, theta):
     """
@@ -118,7 +124,21 @@ def rotation_3d(omega, theta):
     rot - (3,3) ndarray: the resulting rotation matrix
     """
 
-    # YOUR CODE HERE
+    norm = np.linalg.norm(omega) #norm = ||w||
+    
+    # Get the skew-symmetric matrix of omega
+    omega_hat = skew_3d(omega)
+    
+    
+    # Identity matrix
+    I = np.eye(3)
+    
+    # Rodrigues' rotation formula
+    rot = I + ((omega_hat/norm) * np.sin(norm*theta)) + ( (np.dot(omega_hat, omega_hat)/(norm**2))* (1-np.cos(norm*theta)))
+    
+    return rot
+
+
 
 def hat_3d(xi):
     """
@@ -130,8 +150,21 @@ def hat_3d(xi):
     Returns:
     xi_hat - (4,4) ndarray: the corresponding 4x4 matrix
     """
+    v = xi[:3]   # Angular velocity
+    w = xi[3:]       # Linear velocity
+    
+    # Create the skew-symmetric matrix for omega
+    omega_hat = skew_3d(w)
+    
+    # Construct the 4x4 matrix xi_hat
+    xi_hat = np.zeros((4, 4))
+    xi_hat[:3, :3] = omega_hat   # Top-left 3x3 is omega_hat
+    xi_hat[:3, 3] = v           # Top-right 3x1 is v
+    
+    
+    return xi_hat
 
-    # YOUR CODE HERE
+
 
 def homog_3d(xi, theta):
     """
@@ -144,8 +177,32 @@ def homog_3d(xi, theta):
     Returns:
     g - (4,4) ndarary: the resulting homogeneous transformation matrix
     """
+    v = xi[:3]  # Linear Velocity
+    w = xi[3:]      # Angular velocity
+    
+    # Compute the norm of omega to check if it is a pure translation or rotation
+    
+    norm = np.linalg.norm(w)
+    
+    # If omega is not a zero vector (non-zero rotation)
+    if norm != 0:
+        omega_hat = skew_3d(w)
+        R = rotation_3d(w,theta)
+        
+        
+        t = (1/norm**2) * ((np.eye(3)-R)@(omega_hat@v) + ((np.outer(w,w.T))@(v*theta)))
+    
+    else:  # Pure translation (when omega is zero)
+        R = np.eye(3)  
+        t = v * theta  
 
-    # YOUR CODE HERE
+    # Construct the homogeneous transformation matrix
+    g = np.eye(4)
+    g[:3, :3] = R  # Rotation part
+    g[:3, 3] = t   # Translation part
+    
+    return g
+
 
 
 def prod_exp(xi, theta):
@@ -161,7 +218,27 @@ def prod_exp(xi, theta):
     g - (4,4) ndarray: the resulting homogeneous transformation matrix
     """
 
-    # YOUR CODE HERE
+     # Ensure xi is a numpy array
+    xi = np.asarray(xi)
+    theta = np.asarray(theta)
+    
+    # Ensure xi is 6 x N and theta is N-dimensional
+    if xi.shape[0] != 6:
+        raise ValueError("Twists xi must have shape (6, N)")
+    if xi.shape[1] != theta.shape[0]:
+        raise ValueError("There must be the same number of twists and joint displacements.")
+    
+    # Initialize the homogeneous transformation matrix as the identity matrix
+    g = np.eye(4)
+    
+    # Multiply the exponential of each twist for the given displacement
+    for i in range(theta.shape[0]):
+        g_i = homog_3d(xi[:, i], theta[i])  # Compute the transformation for joint i
+        g = np.dot(g, g_i)  # Update the product of exponentials
+    
+    return g
+
+    
 
 #---------------------------------TESTING CODE---------------------------------
 #-------------------------DO NOT MODIFY ANYTHING BELOW HERE--------------------
