@@ -44,29 +44,49 @@ class ObjectDetector:
 
     def camera_info_callback(self, msg):
         # TODO: Extract the intrinsic parameters from the CameraInfo message (look this message type up online)
-        self.fx = ...
-        self.fy = ...
-        self.cx = ...
-        self.cy = ...
-
+        K = msg.K
+        
+        K = np.array([
+            [K[0], K[1], K[2]],
+            [K[3], K[4], K[5]],
+            [K[6], K[7], K[8]]
+        ])
+        
+        self.fx = K[0,0]
+        self.fy = K[1,1]
+        self.cx = K[0,2]
+        self.cy = K[1,2]
+    
+    
+    
     def pixel_to_point(self, u, v, depth):
         # TODO: Use the camera intrinsics to convert pixel coordinates to real-world coordinates
-        X = ...
-        Y = ...
-        Z = ...
+        f_x = self.fx
+        f_y = self.fy
+        x_0 = self.cx
+        y_0 = self.cy
+
+        Z_cam = depth
+        X_cam = ((u - x_0) * Z_cam) / f_x
+        Y_cam = ((v - y_0) * Z_cam) / f_y   
+        
+        X = X_cam
+        Y = Y_cam
+        Z = Z_cam
+
+        print("PIXEL TO POINT:", X,Y,Z)
         return X, Y, Z
 
     def color_image_callback(self, msg):
         try:
             # Convert the ROS Image message to an OpenCV image (BGR8 format)
             self.cv_color_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-
             # If we have both color and depth images, process them
             if self.cv_depth_image is not None:
                 self.process_images()
 
         except Exception as e:
-            print("Error:", e)
+            print("Error1:", e)
 
     def depth_image_callback(self, msg):
         try:
@@ -74,7 +94,7 @@ class ObjectDetector:
             self.cv_depth_image = self.bridge.imgmsg_to_cv2(msg, "16UC1")
 
         except Exception as e:
-            print("Error:", e)
+            print("Error2:", e)
 
     def process_images(self):
         # Convert the color image to HSV color space
@@ -82,18 +102,21 @@ class ObjectDetector:
         # TODO: Define range for cup color in HSV
         # Run `python hsv_color_thresholder.py` and tune the bounds so you only see your cup
         # update lower_hsv and upper_hsv directly
-
-        lower_hsv = np.array(...) # TODO: Define lower HSV values for cup color
-        upper_hsv = np.array(...) # TODO: Define upper HSV values for cup color
-
+        lower_hsv = np.array([0, 87, 117]) # TODO: Define lower HSV values for cup color
+        upper_hsv = np.array([179, 255, 255]) # TODO: Define upper HSV values for cup color
+        print(lower_hsv,upper_hsv)
         # TODO: Threshold the image to get only cup colors
         # HINT: Lookup cv2.inRange()
-        mask = ...
+        mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
+        print("mask:", mask)
+
 
         # TODO: Get the coordinates of the cup points on the mask
         # HINT: Lookup np.nonzero()
-        y_coords, x_coords = ...
+        
 
+        y_coords, x_coords = np.nonzero(mask)
+        print("x and y coord:", y_coords, x_coords)
         # If there are no detected points, exit
         if len(x_coords) == 0 or len(y_coords) == 0:
             print("No points detected. Is your color filter wrong?")
@@ -105,7 +128,7 @@ class ObjectDetector:
 
         # Fetch the depth value at the center
         depth = self.cv_depth_image[center_y, center_x]
-
+        print("CHECK:", self.fx,self.fy,self.cx,self.cy)
         if self.fx and self.fy and self.cx and self.cy:
             camera_x, camera_y, camera_z = self.pixel_to_point(center_x, center_y, depth)
             camera_link_x, camera_link_y, camera_link_z = camera_z, -camera_x, -camera_y

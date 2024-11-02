@@ -27,9 +27,9 @@ def controller(waypoint):
   """
 
   # Create a publisher and a tf buffer, which is primed with a tf listener
-  pub = ## TODO: what topic should we publish to? how?
-  tfBuffer = ... ## TODO: initialize a buffer
-  tfListener = ## TODO: initialize a transform listener
+  pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)## : what topic should we publish to? how?
+  tfBuffer = tf2_ros.Buffer() ## initialize a buffer
+  tfListener = tf2_ros.TransformListener(tfBuffer) ## initialize a transform listener
 
   # Create a timer object that will sleep long enough to result in
   # a 10Hz publishing rate
@@ -38,39 +38,42 @@ def controller(waypoint):
 
   # All in the form [x, y]
   # NOTE: The Turtlebot typically does not need an integral term so we set it to 0 to make this a PD controller
-  Kp = np.diag([2, 0.8]) # TODO: You may need to tune these values for your turtlebot
-  Kd = np.diag([-0.5, 0.5]) # TODO: You may need to tune these values for your turtlebot
+  Kp = np.diag([2.0, 1.6]) # TODO: You may need to tune these values for your turtlebot
+  Kd = np.diag([-0.4, 0.4]) # TODO: You may need to tune these values for your turtlebot
   Ki = np.diag([0, 0])
 
-  prev_time = # TODO: initialize your time, what rospy function would be helpful here?
-  integ = # TODO: initialize an empty np array -- make sure to keep your sizes consistent
-  derivative = # TODO: initialize an empty np array 
-  previous_error = # TODO: initialize an empty np array 
+  prev_time = rospy.get_time() # : initialize your time, what rospy function would be helpful here?
+  integ = np.zeros(2)# TODO: initialize an empty np array -- make sure to keep your sizes consistent
+  derivative = np.zeros(2) # TODO: initialize an empty np array 
+  previous_error = np.zeros(2) # TODO: initialize an empty np array 
 
   # Loop until the node is killed with Ctrl-C
   while not rospy.is_shutdown():
+
+    print("hi")
     try:
       #                                              target_frame, source_frame, current_time_in_ros, how long to wait for transform lookup
-      trans_odom_to_base_link = tfBuffer.lookup_transform(..., ..., rospy.Time(), rospy.Duration(5)) # TODO: create a transform between odom to base link
+      trans_odom_to_base_link = tfBuffer.lookup_transform("base_footprint","odom" ,rospy.Time(), rospy.Duration(5)) # TODO: create a transform between odom to base link
+      # PROBABLY target_frame = camera_link, source = odom 
 
       (roll, pitch, baselink_yaw) = tf.transformations.euler_from_quaternion(
         [trans_odom_to_base_link.transform.rotation.x, trans_odom_to_base_link.transform.rotation.y,
             trans_odom_to_base_link.transform.rotation.z, trans_odom_to_base_link.transform.rotation.w])
 
 
-      waypoint_trans = # TODO: initialize a PoseStamped
-      waypoint_trans.pose.position.x = # TODO: what value would you use here?
-      waypoint_trans.pose.position.y = # TODO: what value would you use here?
-      waypoint_trans.pose.position.z = # TODO: what value would you use here?  # Assuming the waypoint is on the ground
+      waypoint_trans = PoseStamped() # : initialize a PoseStamped
+      waypoint_trans.pose.position.x = waypoint[0] # TODO: what value would you use here?
+      waypoint_trans.pose.position.y = waypoint[1] # TODO: what value would you use here?
+      waypoint_trans.pose.position.z = 0 # TODO: what value would you use here?  # Assuming the waypoint is on the ground
 
-      quat = quaternion_from_euler() # TODO: what would be the inputs to this function (there are 3)
-      waypoint_trans.pose.orientation.x = # TODO: what value would you use here?
-      waypoint_trans.pose.orientation.y = # TODO: what value would you use here?
-      waypoint_trans.pose.orientation.z = # TODO: what value would you use here?
-      waypoint_trans.pose.orientation.w = # TODO: what value would you use here?
+      quat = quaternion_from_euler(0,0,waypoint[2]) # TODO: what would be the inputs to this function (there are 3)
+      waypoint_trans.pose.orientation.x = quat[0] # TODO: what value would you use here?
+      waypoint_trans.pose.orientation.y = quat[1]# TODO: what value would you use here?
+      waypoint_trans.pose.orientation.z = quat[2]# TODO: what value would you use here?
+      waypoint_trans.pose.orientation.w = quat[3]# TODO: what value would you use here?
 
       # Use the transform to compute the waypoint's pose in the base_link frame
-      waypoint_in_base_link = do_transform_pose() # TODO: what would be the inputs to this function (there are 2)
+      waypoint_in_base_link = do_transform_pose(waypoint_trans, trans_odom_to_base_link) # TODO: what would be the inputs to this function (there are 2)
       (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(
         [waypoint_in_base_link.pose.orientation.x, waypoint_in_base_link.pose.orientation.y,
             waypoint_in_base_link.pose.orientation.z, waypoint_in_base_link.pose.orientation.w])
@@ -85,18 +88,18 @@ def controller(waypoint):
       # Process trans to get your state error
       # Generate a control command to send to the robot
       x_error = waypoint_in_base_link.pose.position.x
-      error = # TODO: what are two values that we can use for this np.array, and what are the dimensions
+      error = np.array([x_error, yaw])# TODO: what are two values that we can use for this np.array, and what are the dimensions
       
       # proportional term
       proportional = np.dot(Kp, error).squeeze()
       
       # integral term
-      dt = # TODO: quick operation to determine dt
-      integ += # TODO: integral is summing up error over time, so what would we expect to add on to our integral term tracker here?
+      dt = curr_time - prev_time # TODO: quick operation to determine dt
+      integ += error * dt # TODO: integral is summing up error over time, so what would we expect to add on to our integral term tracker here?
       integral = np.dot(Ki, integ).squeeze()
 
       # dervative term
-      error_deriv = # TODO: quick operation to determine dt
+      error_deriv = (error - previous_error) / dt # TODO: quick operation to determine dt
       derivative = np.dot(Kd, error_deriv).squeeze()
 
       msg = Twist()
@@ -105,11 +108,14 @@ def controller(waypoint):
 
       control_command = msg
 
-      previous_error = # TODO
-      prev_time = # TODO
+      previous_error = error
+      prev_time = curr_time
       pub.publish(control_command)
-
-      if np.abs : #TODO: what is our stopping condition/how do we know to go to the next waypoint?
+      print("ABS ERRORS")
+      print(np.abs(error[0]))
+      print(np.abs(error[1]))
+      threshold = 0.05
+      if np.abs(error[0]) <= threshold and np.abs(error[1]) <= threshold: #TODO: what is our stopping condition/how do we know to go to the next waypoint?
         print("Moving to next waypoint in trajectory")
         return
 
@@ -122,9 +128,14 @@ def controller(waypoint):
 
 def planning_callback(msg):
   try:
-    trajectory = plan_curved_trajectory() # TODO: What is the tuple input to this function?
 
+    coordtup = (msg.x, msg.y)
+    trajectory = plan_curved_trajectory(coordtup) # TODO: What is the tuple input to this function?
+    print("trajectory length:", len(trajectory))
     # TODO: write a loop to loop over our waypoints and call the controller function on each waypoint
+    for i in trajectory:
+      controller(i)
+
 
   except rospy.ROSInterruptException as e:
     print("Exception thrown in planning callback: " + e)
@@ -141,6 +152,5 @@ if __name__ == '__main__':
   #called /turtlebot_controller.
   rospy.init_node('turtlebot_controller', anonymous=True)
 
-  rospy.Subscriber() # TODO: what are we subscribing to here?
-  
+  rospy.Subscriber("/goal_point", Point, planning_callback) # TODO: what are we subscribing to here?
   rospy.spin()
